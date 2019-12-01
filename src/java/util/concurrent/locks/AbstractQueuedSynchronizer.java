@@ -1258,6 +1258,7 @@ public abstract class AbstractQueuedSynchronizer
      * @return the value returned from {@link #tryRelease}
      */
     public final boolean release(int arg) {
+        // 如果独占锁释放完毕 唤醒头结点的线程
         if (tryRelease(arg)) {
             Node h = head;
             if (h != null && h.waitStatus != 0)
