@@ -129,11 +129,18 @@ public class ThreadLocal<T> {
      * by an invocation of the {@link #initialValue} method.
      *
      * @return the current thread's value of this thread-local
+     *
+     * 返回当前线程 ThreadLocalMap 中存储的以当前 ThreadLocal 作为key 对应的value
+     * 如 map为null  则执行初始化工作
+     * 如 无此 ThreadLocal 对应的 value 返回initialValue 方法中的值
+     *
      */
     public T get() {
         Thread t = Thread.currentThread();
+        // 获得当前线程持有的 ThreadLocalMap
         ThreadLocalMap map = getMap(t);
         if (map != null) {
+            // 获得本 ThreadLocal 实例为key的 Entry
             ThreadLocalMap.Entry e = map.getEntry(this);
             if (e != null) {
                 @SuppressWarnings("unchecked")
@@ -141,6 +148,8 @@ public class ThreadLocal<T> {
                 return result;
             }
         }
+        // map 未初始化或 map中无 以本 ThreadLocal 对象 为key 的 节点
+        // 执行初始化
         return setInitialValue();
     }
 
@@ -151,12 +160,15 @@ public class ThreadLocal<T> {
      * @return the initial value
      */
     private T setInitialValue() {
+        // 获得初始值 默认实现为null
         T value = initialValue();
         Thread t = Thread.currentThread();
         ThreadLocalMap map = getMap(t);
+        // map已经初始化 将初始值set进去
         if (map != null)
             map.set(this, value);
         else
+            // 初始化map 并加入初始值
             createMap(t, value);
         return value;
     }
@@ -409,9 +421,11 @@ public class ThreadLocal<T> {
         private Entry getEntry(ThreadLocal<?> key) {
             int i = key.threadLocalHashCode & (table.length - 1);
             Entry e = table[i];
+            // 命中 返回该节点
             if (e != null && e.get() == key)
                 return e;
             else
+                // 未命中 向后寻找 直到为null 返回null
                 return getEntryAfterMiss(key, i, e);
         }
 
@@ -427,13 +441,15 @@ public class ThreadLocal<T> {
         private Entry getEntryAfterMiss(ThreadLocal<?> key, int i, Entry e) {
             Entry[] tab = table;
             int len = tab.length;
-
+            // 持续向下寻找 直到e为null
             while (e != null) {
                 ThreadLocal<?> k = e.get();
                 if (k == key)
                     return e;
+                // 有key为null 但节点不为null 的节点 执行顺序清理
                 if (k == null)
                     expungeStaleEntry(i);
+                // 处理下一个位置的节点
                 else
                     i = nextIndex(i, len);
                 e = tab[i];

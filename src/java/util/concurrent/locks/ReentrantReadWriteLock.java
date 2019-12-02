@@ -381,7 +381,8 @@ public class ReentrantReadWriteLock
                     // would cause deadlock.
                 // 独占锁未被获取 再 二次确认 读应当阻塞  则处理 读锁重入
                 } else if (readerShouldBlock()) {
-                    // firstReader 线程重入读锁，直接到下面的 CAS
+                    // firstReader 为当前线程 说明 当前线程有读锁还未释放 完全释放后 会将firstReader置null
+                    // 线程重入读锁，直接到下面的 CAS
                     if (firstReader == current) {
                         // assert firstReaderHoldCount > 0;
                     } else {
