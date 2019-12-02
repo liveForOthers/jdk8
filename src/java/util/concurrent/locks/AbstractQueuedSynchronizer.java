@@ -1668,11 +1668,14 @@ public abstract class AbstractQueuedSynchronizer
      * @param node the node
      * @return true if successfully transferred (else the node was
      * cancelled before signal)
+     *
+     * 将 节点由等待队列中 转移到 同步队列中 成功返回true, otherwise false
      */
     final boolean transferForSignal(Node node) {
         /*
          * If cannot change waitStatus, the node has been cancelled.
          */
+        // 如果更新节点状态失败  则说明 该节点已被取消 直接返回失败
         if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
             return false;
 
@@ -1682,9 +1685,21 @@ public abstract class AbstractQueuedSynchronizer
          * attempt to set waitStatus fails, wake up to resync (in which
          * case the waitStatus can be transiently and harmlessly wrong).
          */
+        // 将当前节点加入 同步队列
+        // p是该Node的前驱
         Node p = enq(node);
         int ws = p.waitStatus;
+        // 等待状态waitStatus 含，
+        // 0：初始状态；CANCELLED
+        // 1：被取消；
+        // SIGNAL -1：当前线程释放资源或取消后需要唤醒后继节点；
+        // CONDITION -2：条件等待；
+        // PROPAGATE -3：下一个acquireShared操作应该被无条件传播。
+        // 实际使用中，一般只关注正负，非负数就意味着节点不需要释放信号
+
+        // 如果前驱节点 为取消状态 或 cas更改前驱节点为 SIGNAL 状态失败
         if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+            // 执行唤醒 当前节点
             LockSupport.unpark(node.thread);
         return true;
     }
@@ -1900,12 +1915,17 @@ public abstract class AbstractQueuedSynchronizer
          * null. Split out from signal in part to encourage compilers
          * to inline the case of no waiters.
          * @param first (non-null) the first node on condition queue
+         *
+         * 执行唤醒
          */
         private void doSignal(Node first) {
             do {
+                // 更新 firstWaiter 以及 lastWaiter
                 if ( (firstWaiter = first.nextWaiter) == null)
                     lastWaiter = null;
+                // help gc
                 first.nextWaiter = null;
+            // 如果唤醒不成功 且 下一个节点 不为null 循环持续唤醒
             } while (!transferForSignal(first) &&
                      (first = firstWaiter) != null);
         }
@@ -1967,10 +1987,13 @@ public abstract class AbstractQueuedSynchronizer
          *         returns {@code false}
          */
         public final void signal() {
+            // 判断当前线程是否持有独占锁 如未持有 直接抛出 IllegalMonitorStateException 异常
             if (!isHeldExclusively())
                 throw new IllegalMonitorStateException();
+            // 拿到头等待节点
             Node first = firstWaiter;
             if (first != null)
+                // 唤醒头结点
                 doSignal(first);
         }
 
