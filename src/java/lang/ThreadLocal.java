@@ -205,6 +205,9 @@ public class ThreadLocal<T> {
      * {@code initialValue} method in the current thread.
      *
      * @since 1.5
+     *
+     * 删除本线程中 ThreadLocalMap 中 key为本 ThreadLocal的节点
+     *
      */
     public void remove() {
         ThreadLocalMap m = getMap(Thread.currentThread());
@@ -507,16 +510,23 @@ public class ThreadLocal<T> {
 
         /**
          * Remove the entry for key.
+         *
+         * 删除本ThreadLocalMap 中  指定key的节点
          */
         private void remove(ThreadLocal<?> key) {
             Entry[] tab = table;
             int len = tab.length;
+            // 获得节点的位置
             int i = key.threadLocalHashCode & (len-1);
+            // 如未命中 向后寻找 直到命中 或节点为null
             for (Entry e = tab[i];
                  e != null;
                  e = tab[i = nextIndex(i, len)]) {
+                // key 命中 节点
                 if (e.get() == key) {
+                    // 清除 key的引用
                     e.clear();
+                    // 执行连续段清理 O(n)时间复杂度 效率较差
                     expungeStaleEntry(i);
                     return;
                 }
