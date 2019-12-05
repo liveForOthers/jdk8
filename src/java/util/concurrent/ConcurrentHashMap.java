@@ -1966,75 +1966,151 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
      */
     private final void transfer(Node<K, V>[] tab, Node<K, V>[] nextTab) {
         int n = tab.length, stride;
+        // 计算每个cpu处理的桶数目 多核处理器 旧容器容量/8 再除以 cpu数目  最小值为16个
         if ((stride = (NCPU > 1) ? (n >>> 3) / NCPU : n) < MIN_TRANSFER_STRIDE)
             stride = MIN_TRANSFER_STRIDE; // subdivide range
+        // 如果新容器还未初始化
+        // 多线程拿到同一实例 同时进行扩容  nextTab  创建 多个无用对象
         if (nextTab == null) {            // initiating
             try {
                 @SuppressWarnings("unchecked")
+                // 创建新的容器 容量为原容量的两倍
                 Node<K, V>[] nt = (Node<K, V>[]) new Node<?, ?>[n << 1];
+                // 更新新容器引用
                 nextTab = nt;
             } catch (Throwable ex) {      // try to cope with OOME
+                // 新容器 创建失败 sizeCtl 设置为 int 最大值
                 sizeCtl = Integer.MAX_VALUE;
+                // 结束
                 return;
             }
+            // 更新 实例 属性  多线程拿到同一实例 同时进行扩容 nextTable被多次改变
             nextTable = nextTab;
             transferIndex = n;
         }
+        // 初始化ForwardingNode节点，其中保存了新数组nextTable的引用，
+        // 在处理完每个槽位的节点之后当做占位节点，表示该槽位已经处理过了；
         int nextn = nextTab.length;
         ForwardingNode<K, V> fwd = new ForwardingNode<K, V>(nextTab);
+        // 首次推进为true  为true  需要再次推进一个下标 为false 不能推进下标 需要将当前下标处理完才能继续推进
         boolean advance = true;
+        // 完成状态  true  已完成 结束
         boolean finishing = false; // to ensure sweep before committing nextTab
+
+        // 通过for自循环处理每个槽位中的链表元素，
         for (int i = 0, bound = 0; ; ) {
             Node<K, V> f;
             int fh;
+            // 如果当前线程可以向后推进；这个循环就是
+            // 1 控制 i 递减。同时，
+            // 2 每个线程都会进入这里取得自己需要转移的桶的区间
             while (advance) {
                 int nextIndex, nextBound;
+                // 对 i 减一，判断是否大于等于 bound  判断上次领取的任务是否已完成
+                // （正常情况下，如果大于 bound 不成立，说明该线程上次领取的任务已经完成了。
+                // 那么，需要在下面继续领取任务）
+                //
+                // 如果对 i 减一大于等于 bound（还需要继续做任务），或者完成了，修改推进状态为 false，不能推进了。
+                // 任务成功后修改推进状态为 true。
+                //
+                // 通常，
+                // 第一次进入循环，i-- 这个判断会无法通过，从而走下面的 nextIndex 赋值操作（获取最新的转移下标）。
+                // 其余情况都是：如果可以推进，将 i 减一，然后修改成不可推进。如果 i 对应的桶处理成功了，改成可以推进。
                 if (--i >= bound || finishing)
                     advance = false;
+                // 获取最新的转移下标
+                // 这里的目的是：
+                // 1. 当一个线程进入时，会选取最新的转移下标。
+                // 2. 当一个线程处理完自己的区间时，如果还有剩余区间的没有别的线程处理。再次获取区间。
                 else if ((nextIndex = transferIndex) <= 0) {
+                    // 如果小于等于0，说明没有区间了 ，i 改成 -1，推进状态变成 false，
+                    // 不再推进，表示，扩容结束了，当前线程可以退出了
+                    // 这个 -1 会在下面的 if 块里判断，从而进入完成状态判断
                     i = -1;
+                    // 这里设置 false，是为了防止在没有成功处理一个桶的情况下却进行了推进
                     advance = false;
+                // 通过CAS设置transferIndex属性值，并初始化i和bound值，
+                // i指当前处理的槽位序号，bound指需要处理的槽位边界，先处理槽位15的节点；
+                // CAS 修改 transferIndex，即 length - 区间值，留下剩余的区间值供后面的线程使用
                 } else if (U.compareAndSwapInt
                         (this, TRANSFERINDEX, nextIndex,
                                 nextBound = (nextIndex > stride ?
                                         nextIndex - stride : 0))) {
+                    // 这个值就是当前线程可以处理的最小当前区间最小下标
                     bound = nextBound;
+                    // 初次对i 赋值，这个就是当前线程可以处理的当前区间的最大下标
                     i = nextIndex - 1;
+                    // 这里设置 false，是为了防止在没有成功处理一个桶的情况下却进行了推进，
+                    // 这样对导致漏掉某个桶。下面的 if (tabAt(tab, i) == f) 判断会出现这样的情况。
                     advance = false;
                 }
             }
+            // 如果 i 小于0 （不在 tab 下标内，按照上面的判断，领取最后一段区间的线程扩容结束）
+            //  如果 i >= tab.length(不知道为什么这么判断)
+            //  如果 i + tab.length >= nextTable.length  （不知道为什么这么判断）
             if (i < 0 || i >= n || i + n >= nextn) {
                 int sc;
+                // 如果所有线程完成扩容
                 if (finishing) {
+                    // 删除成员变量
                     nextTable = null;
+                    // 更新容器
                     table = nextTab;
+                    // 更新下次扩容阈值  2n- 1/4 *2n = 3/4 *2n
                     sizeCtl = (n << 1) - (n >>> 1);
+                    // 结束扩容任务
                     return;
                 }
+                // 如果没完成扩容  尝试 更新SIZECTL 为 sc -1. 表示这个线程结束帮助扩容了，将 sc 的低 16 位减一。
                 if (U.compareAndSwapInt(this, SIZECTL, sc = sizeCtl, sc - 1)) {
+                    // 如果 sc - 2 不等于标识符左移 16 位。 说明还有 别的线程扩容未完成
                     if ((sc - 2) != resizeStamp(n) << RESIZE_STAMP_SHIFT)
                         return;
+                    // 如果他们相等了，说明没有线程在帮助他们扩容了。也就是说，扩容结束了。
                     finishing = advance = true;
+                    // 再次循环检查一下整张表
                     i = n; // recheck before commit
                 }
+            // 获取老 tab i 下标位置的变量，如果是 null，就使用 fwd 占位。
             } else if ((f = tabAt(tab, i)) == null)
+                // 使用 fwd 占位。
                 advance = casTabAt(tab, i, null, fwd);
+            // 当前槽位已被处理
+            // 如果槽位15已经被线程A处理了，那么线程B处理到这个节点时，
+            // 取到该节点的hash值应该为MOVED，值为-1，则直接跳过，继续处理下一个槽位14的节点；
+            // 如果不是 null 且 hash 值是 MOVED。 说明别的线程已经处理过了，再次推进一个下标
             else if ((fh = f.hash) == MOVED)
                 advance = true; // already processed
+            // 如 本次扩容未结束  且 当前槽头结点不为null  且  当前槽未被其他线程处理 则本线程尝试处理该槽扩容
+            // 处理当前槽位的节点
             else {
+                // 加锁  保证只有一个线程处理当前槽扩容  且 避免扩容时 其他线程修改本槽中节点 产生多线程安全问题
                 synchronized (f) {
+                    // 确保 f 节点依旧为 该槽位置的头结点 在 synchronized 之前 原头结点可能已被remove
                     if (tabAt(tab, i) == f) {
+                        // 先定义两个变量节点ln和hn，
+                        // lowNode和highNode，分别保存hash值的第X位为0和1的节点
                         Node<K, V> ln, hn;
+                        // 当前槽位 为链表结构  树节点hash值为-2
                         if (fh >= 0) {
+                            // 散列值 在 原容量最高位 的值
+                            // 如果是结果是0 ，Doug Lea 将其放在低位，扩容后该节点 位置不变
+                            // 反之放在高位，高位上的节点位置 移到现有位置+n 的位置上
                             int runBit = fh & n;
+                            // 记录从此节点的所有后继节点 &n 皆相同 的头结点
                             Node<K, V> lastRun = f;
+                            // 拿的最后一个与之前runBit 的节点
                             for (Node<K, V> p = f.next; p != null; p = p.next) {
+                                // 当前节点 散列值 在 原容量最高位 的值
                                 int b = p.hash & n;
+                                // 当前节点高位与 之前的节点高位不同  更新last头结点为当前节点 并更新 高位bit
                                 if (b != runBit) {
                                     runBit = b;
                                     lastRun = p;
                                 }
                             }
+                            // 哈希值在第 2^x 次幂 位置值为0
+                            // 保证顺序  把last头结点 的链表方案
                             if (runBit == 0) {
                                 ln = lastRun;
                                 hn = null;
@@ -2042,19 +2118,26 @@ public class ConcurrentHashMap<K, V> extends AbstractMap<K, V>
                                 hn = lastRun;
                                 ln = null;
                             }
+                            // 从头结点开始向后处理各个节点 直到 last头结点 结束
                             for (Node<K, V> p = f; p != lastRun; p = p.next) {
                                 int ph = p.hash;
                                 K pk = p.key;
                                 V pv = p.val;
+                                // 扩容后  同一个槽中 节点顺序会发生变化
                                 if ((ph & n) == 0)
                                     ln = new Node<K, V>(ph, pk, pv, ln);
                                 else
                                     hn = new Node<K, V>(ph, pk, pv, hn);
                             }
+                            // 最高位为0 的节点  通过volatile 方法 将高位为0的链表头结点设置在当前位置
                             setTabAt(nextTab, i, ln);
+                            // 最高位为1 的节点  通过volatile 方法 将高位为1的链表头结点设置在当前位置
                             setTabAt(nextTab, i + n, hn);
+                            // 将当前节点设置为已处理节点
                             setTabAt(tab, i, fwd);
+                            // 基础处理后面的槽
                             advance = true;
+                        // 执行树类型的槽的迁移
                         } else if (f instanceof TreeBin) {
                             TreeBin<K, V> t = (TreeBin<K, V>) f;
                             TreeNode<K, V> lo = null, loTail = null;
