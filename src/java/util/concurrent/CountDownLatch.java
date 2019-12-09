@@ -157,30 +157,39 @@ public class CountDownLatch {
     /**
      * Synchronization control For CountDownLatch.
      * Uses AQS state to represent count.
+     *
+     * Sync重写了tryAcquireShared()和tryReleaseShared()方法，并把count存到state变量中去。
+     *
+     * 这里要注意一下，上面两个方法的参数并没有什么卵用。
      */
     private static final class Sync extends AbstractQueuedSynchronizer {
         private static final long serialVersionUID = 4982264981922014374L;
-
+        // 内部类构造器 初始化次数
         Sync(int count) {
             setState(count);
         }
-
+        // 获得剩余次数
         int getCount() {
             return getState();
         }
-
+        // 尝试获取共享锁
         protected int tryAcquireShared(int acquires) {
+            // 注意，这里state等于0的时候返回的是1，也就是说count减为0的时候获取总是成功
+            // state不等于0的时候返回的是-1，也就是count不为0的时候总是要排队
             return (getState() == 0) ? 1 : -1;
         }
-
+        // 尝试释放共享锁
         protected boolean tryReleaseShared(int releases) {
             // Decrement count; signal when transition to zero
             for (;;) {
                 int c = getState();
+                // 没有可释放的共享锁 返回失败
                 if (c == 0)
                     return false;
                 int nextc = c-1;
+                // cas 释放锁
                 if (compareAndSetState(c, nextc))
+                    // 共享锁已完全释放 返回成功  这时会唤醒后面排队的线程
                     return nextc == 0;
             }
         }
