@@ -194,15 +194,12 @@ public class CountDownLatch {
             }
         }
     }
-
+    // 持有的内部类的引用  通过构造方法进行初始化
     private final Sync sync;
 
     /**
-     * Constructs a {@code CountDownLatch} initialized with the given count.
      *
-     * @param count the number of times {@link #countDown} must be invoked
-     *        before threads can pass through {@link #await}
-     * @throws IllegalArgumentException if {@code count} is negative
+     * 构造方法 初始化 内部类同步器  在内部类同步器的构造方法中 初始化次数
      */
     public CountDownLatch(int count) {
         if (count < 0) throw new IllegalArgumentException("count < 0");
