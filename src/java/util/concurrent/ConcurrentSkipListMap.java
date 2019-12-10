@@ -388,6 +388,10 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * Initializes or resets state. Needed by constructors, clone,
      * clear, readObject. and ConcurrentSkipListSet.clone.
      * (Note that comparator must be separately initialized.)
+     *
+     * 初始化了一些属性，并创建了一个头索引节点，里面存储着一个数据节点，这个数据节点的值是公共的空对象，且它的层级是1。
+     *
+     * 初始化的时候，跳表中只有一个头索引节点，层级是1，数据节点是一个公共空对象，down和right都是null。
      */
     private void initialize() {
         keySet = null;
@@ -413,6 +417,10 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * headed by a dummy node accessible as head.node. The value field
      * is declared only as Object because it takes special non-V
      * values for marker and header nodes.
+     *
+     * 单链表实现内部类
+     * 注意：这里value的类型是Object，而不是V
+     * 在删除元素的时候value会指向当前元素本身
      */
     static final class Node<K,V> {
         final K key;
@@ -421,6 +429,7 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
 
         /**
          * Creates a new regular node.
+         * 创建标准节点的构造函数
          */
         Node(K key, Object value, Node<K,V> next) {
             this.key = key;
@@ -434,9 +443,12 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
          * have null keys, a fact that is exploited in a few places,
          * but this doesn't distinguish markers from the base-level
          * header node (head.node), which also has a null key.
+         *
+         * 创建marker  以及  头结点的 构造函数
          */
         Node(Node<K,V> next) {
             this.key = null;
+            // 当前元素本身(marker)
             this.value = this;
             this.next = next;
         }
@@ -561,11 +573,13 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * fields, they have different types and are handled in different
      * ways, that can't nicely be captured by placing field in a
      * shared abstract class.
+     *
+     * 索引节点，存储着对应的node值、向下和向右的索引指针
      */
     static class Index<K,V> {
         final Node<K,V> node;
-        final Index<K,V> down;
-        volatile Index<K,V> right;
+        final Index<K,V> down; // 向下索引指针
+        volatile Index<K,V> right; // 向右索引指针
 
         /**
          * Creates index node with given values.
@@ -635,9 +649,11 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
 
     /**
      * Nodes heading each level keep track of their level.
+     *
+     * 头索引节点，继承自Index，并扩展一个level字段，用于记录索引的层级
      */
     static final class HeadIndex<K,V> extends Index<K,V> {
-        final int level;
+        final int level; // 扩展一个level字段，用于记录索引的层级
         HeadIndex(Node<K,V> node, Index<K,V> down, Index<K,V> right, int level) {
             super(node, down, right);
             this.level = level;
@@ -664,29 +680,46 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * rely on this side-effect of clearing indices to deleted nodes.
      * @param key the key
      * @return a predecessor of key
+     *
+     * 找到最下层 的小于 当前key 的 数据节点
      */
     private Node<K,V> findPredecessor(Object key, Comparator<? super K> cmp) {
         if (key == null)
             throw new NullPointerException(); // don't postpone errors
         for (;;) {
+            // 根据 索引节点查找 q是当前层伪头
             for (Index<K,V> q = head, r = q.right, d;;) {
+                // 如当前索引层 还有节点
                 if (r != null) {
+                    // 获得数据节点
                     Node<K,V> n = r.node;
+                    // 获得key
                     K k = n.key;
+                    // 如value 为 null 说明当前节点已删除
                     if (n.value == null) {
+                        // 将当前节点删除  失败 自旋重试
                         if (!q.unlink(r))
                             break;           // restart
+                        // 更新 r
                         r = q.right;         // reread r
+                        // 继续自旋
                         continue;
                     }
+                    // 如果key 大于当前节点的 k
+                    // q更新为当前索引节点
+                    // r成为下一个索引节点
                     if (cpr(cmp, key, k) > 0) {
                         q = r;
                         r = r.right;
                         continue;
                     }
                 }
+                // 如下层为null 说明本层为最底层  q就是索引节点
                 if ((d = q.down) == null)
+                    // 返回 数据节点
                     return q.node;
+                // 下层 不为null 更新q 为下层节点 r为下层节点的下一个节点 继续处理本层次直到
+                // 找到本层 离key最近的小于key 的数据节点
                 q = d;
                 r = d.right;
             }
@@ -815,29 +848,42 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * @return the old value, or null if newly inserted
      */
     private V doPut(K key, V value, boolean onlyIfAbsent) {
+        // 添加的元素存储在z节点中
         Node<K,V> z;             // added node
+        // 键 不可为null
         if (key == null)
             throw new NullPointerException();
         Comparator<? super K> cmp = comparator;
+        // 找到目标位置 并插入 最下一层插入成功后即成功  自旋重试
         outer: for (;;) {
+            // 找到目标key 的 最近的小于 目标key的 最低层的数据节点 作为前继节点
             for (Node<K,V> b = findPredecessor(key, cmp), n = b.next;;) {
                 if (n != null) {
                     Object v; int c;
                     Node<K,V> f = n.next;
+                    // 如果n不为b的下一个节点
+                    // 说明有其它线程修改了数据，则跳出内层循环
+                    // 也就是回到了外层循环自旋的位置，从头来过
                     if (n != b.next)               // inconsistent read
                         break;
+                    // 如下一个节点已被删除  则执行删除  重新来过
                     if ((v = n.value) == null) {   // n is deleted
                         n.helpDelete(b, f);
                         break;
                     }
+                    // 如前继节点已经被删除 或 后继节点为marker节点，那b就是被删除的那个  重新来过
                     if (b.value == null || v == n) // b is deleted
                         break;
+                    // 如key 大于 后继节点的key 向后找后继  以及前继
                     if ((c = cpr(cmp, key, n.key)) > 0) {
                         b = n;
                         n = f;
                         continue;
                     }
+                    // 如果 key 等于 后继节点的key
                     if (c == 0) {
+                        // 允许替换已存在的 key 的value  也就是  onlyIfAbsent==false  直接返回旧值
+                        // 不允许替换  则cas 尝试替换value 返回旧值
                         if (onlyIfAbsent || n.casValue(v, value)) {
                             @SuppressWarnings("unchecked") V vv = (V)v;
                             return vv;
@@ -846,10 +892,16 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
                     }
                     // else c < 0; fall through
                 }
+                // 有两种情况会到这里
+                // 一是到链表尾部了，也就是n为null了
+                // 二是找到了目标节点的位置，也就是上面的c<0
 
+                // 创建新节点 后继为n
                 z = new Node<K,V>(key, value, n);
+                // cas更新失败 自旋重试
                 if (!b.casNext(n, z))
                     break;         // restart if lost race to append to b
+                // cas更新成功 结束 并跳出两层循环
                 break outer;
             }
         }
@@ -1279,6 +1331,8 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
     /**
      * Constructs a new, empty map, sorted according to the
      * {@linkplain Comparable natural ordering} of the keys.
+     *
+     * 调用 initialize 方法进行初始化
      */
     public ConcurrentSkipListMap() {
         this.comparator = null;
@@ -1574,10 +1628,18 @@ public class ConcurrentSkipListMap<K,V> extends AbstractMap<K,V>
      * @throws ClassCastException if the specified key cannot be compared
      *         with the keys currently in the map
      * @throws NullPointerException if the specified key or value is null
+     *
+     * 跳表插入元素的时候会通过
+     * 1 抛硬币的方式决定出新节点需要的层级，然后
+     * 2 找到各层链中它所在的位置，最后
+     * 3 通过单链表插入的方式把节点及索引插入进去来实现的。
      */
     public V put(K key, V value) {
+        // 不能存储value为null的元素
+        // 因为value为null标记该元素被删除
         if (value == null)
             throw new NullPointerException();
+        // 执行插入数据  如已存在 替换value
         return doPut(key, value, false);
     }
 
