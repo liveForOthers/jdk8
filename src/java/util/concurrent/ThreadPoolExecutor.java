@@ -1180,17 +1180,13 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * It may be more convenient to use one of the {@link Executors} factory
      * methods instead of this general purpose constructor.
      *
-     * @param corePoolSize the number of threads to keep in the pool, even
-     *        if they are idle, unless {@code allowCoreThreadTimeOut} is set
-     * @param maximumPoolSize the maximum number of threads to allow in the
-     *        pool
-     * @param keepAliveTime when the number of threads is greater than
-     *        the core, this is the maximum time that excess idle threads
-     *        will wait for new tasks before terminating.
-     * @param unit the time unit for the {@code keepAliveTime} argument
-     * @param workQueue the queue to use for holding tasks before they are
-     *        executed.  This queue will hold only the {@code Runnable}
-     *        tasks submitted by the {@code execute} method.
+     * @param corePoolSize 如果 allowCoreThreadTimeOut 为false，表示线程池常驻线程数目，
+     *                     即便 该线程空闲也不会被回收
+     * @param maximumPoolSize 线程池中允许的最大线程数目
+     * @param keepAliveTime 当线程池中线程数目大于 核心线程数目，该参数表示空闲线程在该线程池中保持空闲的最长时间
+     * @param unit 用于 keepAliveTime 的时间单位
+     * @param workQueue 任务未被调度时（无空闲线程）会保存在工作队列中，
+     *                  队列中仅仅保存 Runnable类型的 且被 execute方法提交的任务
      * @throws IllegalArgumentException if one of the following holds:<br>
      *         {@code corePoolSize < 0}<br>
      *         {@code keepAliveTime < 0}<br>
@@ -1211,19 +1207,16 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * Creates a new {@code ThreadPoolExecutor} with the given initial
      * parameters and default rejected execution handler.
      *
-     * @param corePoolSize the number of threads to keep in the pool, even
-     *        if they are idle, unless {@code allowCoreThreadTimeOut} is set
-     * @param maximumPoolSize the maximum number of threads to allow in the
-     *        pool
-     * @param keepAliveTime when the number of threads is greater than
-     *        the core, this is the maximum time that excess idle threads
-     *        will wait for new tasks before terminating.
-     * @param unit the time unit for the {@code keepAliveTime} argument
-     * @param workQueue the queue to use for holding tasks before they are
-     *        executed.  This queue will hold only the {@code Runnable}
-     *        tasks submitted by the {@code execute} method.
-     * @param threadFactory the factory to use when the executor
-     *        creates a new thread
+     * @param corePoolSize 如果 allowCoreThreadTimeOut 为false，表示线程池常驻线程数目，
+     *                     即便 该线程空闲也不会被回收
+     * @param maximumPoolSize 线程池中允许的最大线程数目
+     * @param keepAliveTime 当线程池中线程数目大于 核心线程数目，该参数表示空闲线程在该线程池中保持空闲的最长时间
+     * @param unit 用于 keepAliveTime 的时间单位
+     * @param workQueue 任务未被调度时（无空闲线程）会保存在工作队列中，
+     *                  队列中仅仅保存 Runnable类型的 且被 execute方法提交的任务
+     * @param threadFactory 当线程池创建新的线程的时候使用 线程工厂来创建线程
+     *
+     *        handler   先线程池已达到最大线程数目  且队列中无空间时 执行拒绝策略  本构造方法使用了默认的拒绝策略
      * @throws IllegalArgumentException if one of the following holds:<br>
      *         {@code corePoolSize < 0}<br>
      *         {@code keepAliveTime < 0}<br>
@@ -1366,19 +1359,28 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
          * thread.  If it fails, we know we are shut down or saturated
          * and so reject the task.
          */
+        // 拿到 当前线程池的状态值
         int c = ctl.get();
+        // 如果工作线程数目 小于核心线程数目
         if (workerCountOf(c) < corePoolSize) {
+            // 尝试增加线程数目 执行本次任务 执行后续流程
             if (addWorker(command, true))
                 return;
+            // 增加工作线程失败 重新更新 线程池 状态值
             c = ctl.get();
         }
+        // 如果线程池没有关闭  且 任务加入队列成功
         if (isRunning(c) && workQueue.offer(command)) {
+            // 再次校验 线程池状态
             int recheck = ctl.get();
+            // 线程池已关闭 将任务从队列中移除成功 执行拒绝策略
             if (! isRunning(recheck) && remove(command))
                 reject(command);
+            // 线程池未关闭 且工作线程数为0 尝试增加工作线程
             else if (workerCountOf(recheck) == 0)
                 addWorker(null, false);
         }
+        // 如果再次尝试增加线程失败  执行拒绝策略（已经达到最大线程数  线程池已经关闭）
         else if (!addWorker(command, false))
             reject(command);
     }
