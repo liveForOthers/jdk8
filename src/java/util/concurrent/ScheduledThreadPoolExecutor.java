@@ -117,6 +117,11 @@ import java.util.*;
  *
  * @since 1.5
  * @author Doug Lea
+ *
+ * 定时任务线程池类，用于实现定时任务相关功能，将任务包装成定时任务，并按照定时策略来执行，我们后面单独分析这个类。
+ *
+ * 问题：你知道定时任务线程池类使用的是什么队列吗？
+ *
  */
 public class ScheduledThreadPoolExecutor
         extends ThreadPoolExecutor
