@@ -67,12 +67,18 @@ import java.util.*;
  *
  * @since 1.5
  * @author Doug Lea
+ *
+ * 抽象类，运用模板方法设计模式实现了一部分方法，
+ * 主要为执行有返回值任务、批量执行任务的方法。
+ *
  */
 public abstract class AbstractExecutorService implements ExecutorService {
 
     /**
      * Returns a {@code RunnableFuture} for the given runnable and default
      * value.
+     *
+     * 任务都包装成了FutureTask来进行处理
      *
      * @param runnable the runnable task being wrapped
      * @param value the default value for the returned future
@@ -103,6 +109,8 @@ public abstract class AbstractExecutorService implements ExecutorService {
     }
 
     /**
+     * submit()方法对传入的任务都包装成了 FutureTask 来进行处理
+     *
      * @throws RejectedExecutionException {@inheritDoc}
      * @throws NullPointerException       {@inheritDoc}
      */
