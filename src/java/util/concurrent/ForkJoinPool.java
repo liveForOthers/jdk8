@@ -165,6 +165,29 @@ import java.security.Permissions;
  *
  * @since 1.7
  * @author Doug Lea
+ *
+ * 新型线程池类，java7中新增的线程池类，这个线程池与Go中的线程模型特别类似，
+ * 都是基于工作窃取理论，特别适合于处理归并排序这种先分后合的场景。
+ *
+ * 如何充分利用多核CPU，计算很大数组中所有整数的和？
+ *
+ * 单线程相加？
+ * 我们最容易想到就是单线程相加，一个for循环搞定。
+ *
+ * 线程池相加？
+ * 如果进一步优化，我们会自然而然地想到使用线程池来分段相加，最后再把每个段的结果相加。
+ *
+ * 其它？
+ * Yes，就是我们今天的主角——ForkJoinPool，但是它要怎么实现呢？似乎没怎么用过哈^^
+ *
+ * ForkJoinPool和ThreadPoolExecutor都是继承自AbstractExecutorService抽象类，
+ * 所以它和ThreadPoolExecutor的使用几乎没有多少区别，除了任务变成了ForkJoinTask以外。
+ *
+ * 这里又运用到了一种很重要的设计原则——开闭原则——对修改关闭，对扩展开放。
+ *
+ * 可见整个线程池体系一开始的接口设计就很好，新增一个线程池类，不会对原有的代码造成干扰，还能利用原有的特性。
+ *
+ *
  */
 @sun.misc.Contended
 public class ForkJoinPool extends AbstractExecutorService {

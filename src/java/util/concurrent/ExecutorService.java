@@ -141,9 +141,14 @@ public interface ExecutorService extends Executor {
      * tasks are executed, but no new tasks will be accepted.
      * Invocation has no additional effect if already shut down.
      *
+     * 发起有规则的 shutdown， 之前已提交的任务会被执行，新的任务不会被接收
+     * 如果已经shutdown ，则本次调用没有额外的影响
+     *
      * <p>This method does not wait for previously submitted tasks to
      * complete execution.  Use {@link #awaitTermination awaitTermination}
      * to do that.
+     *
+     * 该方法不会等待之前已经提交的任务执行完毕，awaitTermination方法才有这个效果。
      *
      * @throws SecurityException if a security manager exists and
      *         shutting down this ExecutorService may manipulate
@@ -169,6 +174,9 @@ public interface ExecutorService extends Executor {
      * implementations will cancel via {@link Thread#interrupt}, so any
      * task that fails to respond to interrupts may never terminate.
      *
+     * 立即关闭线程池，尝试停止正在运行的任务，未执行的任务将不再执行
+     * 被迫停止及未执行的任务将以列表的形式返回
+     *
      * @return list of tasks that never commenced execution
      * @throws SecurityException if a security manager exists and
      *         shutting down this ExecutorService may manipulate
@@ -183,6 +191,8 @@ public interface ExecutorService extends Executor {
     /**
      * Returns {@code true} if this executor has been shut down.
      *
+     * 判断当前执行器是否已经 shutdown
+     *
      * @return {@code true} if this executor has been shut down
      */
     boolean isShutdown();
@@ -192,6 +202,9 @@ public interface ExecutorService extends Executor {
      * Note that {@code isTerminated} is never {@code true} unless
      * either {@code shutdown} or {@code shutdownNow} was called first.
      *
+     * 只有在 shutdown  或  shutdownNow方法调用之后才起作用
+     * 返回是否所有的任务都已经在 shutdown 之后 完成
+     *
      * @return {@code true} if all tasks have completed following shut down
      */
     boolean isTerminated();
@@ -200,6 +213,9 @@ public interface ExecutorService extends Executor {
      * Blocks until all tasks have completed execution after a shutdown
      * request, or the timeout occurs, or the current thread is
      * interrupted, whichever happens first.
+     *
+     * 阻塞 直到 所有的任务 都已经完成了
+     * 直到执行 shutdown请求 或超时 或 当前线程被中断
      *
      * @param timeout the maximum time to wait
      * @param unit the time unit of the timeout argument
@@ -215,6 +231,8 @@ public interface ExecutorService extends Executor {
      * Future representing the pending results of the task. The
      * Future's {@code get} method will return the task's result upon
      * successful completion.
+     *
+     * 执行有返回值的任务 任务的返回值为task.call()的结果
      *
      * <p>
      * If you would like to immediately block waiting
@@ -240,6 +258,9 @@ public interface ExecutorService extends Executor {
      * representing that task. The Future's {@code get} method will
      * return the given result upon successful completion.
      *
+     * 执行有返回值的任务，任务的返回值的类型 为这里传入的result
+     * 当然只有当任务执行完成了调用get()时才会返回
+     *
      * @param task the task to submit
      * @param result the result to return
      * @param <T> the type of the result
@@ -254,6 +275,10 @@ public interface ExecutorService extends Executor {
      * Submits a Runnable task for execution and returns a Future
      * representing that task. The Future's {@code get} method will
      * return {@code null} upon <em>successful</em> completion.
+     *
+     *
+     * 执行有返回值的任务，任务的返回值为null
+     * 当然只有当任务执行完成了调用get()时才会返回
      *
      * @param task the task to submit
      * @return a Future representing pending completion of the task
@@ -272,6 +297,8 @@ public interface ExecutorService extends Executor {
      * terminated either normally or by throwing an exception.
      * The results of this method are undefined if the given
      * collection is modified while this operation is in progress.
+     *
+     * 批量执行任务，只有当这些任务都完成了这个方法才会返回
      *
      * @param tasks the collection of tasks
      * @param <T> the type of the values returned from the tasks
@@ -298,6 +325,9 @@ public interface ExecutorService extends Executor {
      * terminated either normally or by throwing an exception.
      * The results of this method are undefined if the given
      * collection is modified while this operation is in progress.
+     *
+     * 在指定时间内批量执行任务，未执行完成的任务将被取消
+     * 这里的timeout是所有任务的总时间，不是单个任务的时间
      *
      * @param tasks the collection of tasks
      * @param timeout the maximum time to wait
@@ -327,6 +357,8 @@ public interface ExecutorService extends Executor {
      * The results of this method are undefined if the given
      * collection is modified while this operation is in progress.
      *
+     * 返回任意一个已完成任务的执行结果，未执行完成的任务将被取消
+     *
      * @param tasks the collection of tasks
      * @param <T> the type of the values returned from the tasks
      * @return the result returned by one of the tasks
@@ -349,6 +381,8 @@ public interface ExecutorService extends Executor {
      * completed are cancelled.
      * The results of this method are undefined if the given
      * collection is modified while this operation is in progress.
+     *
+     * 在指定时间内如果有任务已完成，则返回任意一个已完成任务的执行结果，未执行完成的任务将被取消
      *
      * @param tasks the collection of tasks
      * @param timeout the maximum time to wait

@@ -132,6 +132,15 @@ public interface Executor {
      * may execute in a new thread, in a pooled thread, or in the calling
      * thread, at the discretion of the {@code Executor} implementation.
      *
+     * 执行无返回值任务
+     *
+     * 执行既定的任务 在未来某个时间（需要等待线程，线程需要竞争cpu时间片）
+     * 这个任务 可能 在
+     * 1 一个新的线程中执行
+     * 2 在一个池化的线程池中执行
+     * 3 在 调用该方法的线程中执行（当前线程）
+     * 根据接口实现不同而不同
+     *
      * @param command the runnable task
      * @throws RejectedExecutionException if this task cannot be
      * accepted for execution
