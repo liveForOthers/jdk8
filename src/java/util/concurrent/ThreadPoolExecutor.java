@@ -1067,27 +1067,38 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      *    both before and after the timed wait, and if the queue is
      *    non-empty, this worker is not the last thread in the pool.
      *
+     * 实现了 阻塞 或 超时等待一个任务，依赖于当前配置文件设置， 或者返回null 如果当前worker由于以下任意原因必须退出
+     * 1 线程数目超过最大线程数目
+     * 2 线程池已经 STOP 了 不再处理新的任务
+     * 3 线程池已经 SHUTDOWN 且 队列中元素为空
+     * 4 当前 worker 等待任务超时 且 allowCoreThreadTimeOut || workerCount > corePoolSize 则超时worker终止
+     *
      * @return task, or null if the worker must exit, in which case
      *         workerCount is decremented
      */
     private Runnable getTask() {
+        // 标识 最后一次出队 是否超时
         boolean timedOut = false; // Did the last poll() time out?
-
+        // 自旋
         for (;;) {
+            // 校验线程池状态
             int c = ctl.get();
             int rs = runStateOf(c);
 
             // Check if queue empty only if necessary.
+            // 如果线程池 不是running状态 且（不为 SHUTDOWN 状态 或 队列任务未空） 执行减少worker数目 并返回null
             if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
                 decrementWorkerCount();
                 return null;
             }
-
+            // 校验 工作线程数目
             int wc = workerCountOf(c);
 
             // Are workers subject to culling?
             boolean timed = allowCoreThreadTimeOut || wc > corePoolSize;
-
+            // 如 工作线程数目 超过最大线程数目 或
+            // （允许超时回收 且当前已超时）且 （工作线程数>1 或队列为空）
+            // cas减少worker数目 返回null  失败重试
             if ((wc > maximumPoolSize || (timed && timedOut))
                 && (wc > 1 || workQueue.isEmpty())) {
                 if (compareAndDecrementWorkerCount(c))
@@ -1096,11 +1107,14 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             }
 
             try {
+                // 阻塞 或 带有超市时间的阻塞获取任务
+                // 逻辑实现在 生产者消费者模型的 阻塞队列中
                 Runnable r = timed ?
                     workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) :
                     workQueue.take();
                 if (r != null)
                     return r;
+                // 超时时间内还未拿到任务 标记为已超时
                 timedOut = true;
             } catch (InterruptedException retry) {
                 timedOut = false;
@@ -1166,6 +1180,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
             // 当 首要任务不为 null  或 阻塞队列中任务不为null 执行循环
             while (task != null || (task = getTask()) != null) {
                 // 锁定当前 worker
+                // 锁主要是用来控制shutdown()时不要中断正在执行任务的线程。
                 w.lock();
                 // If pool is stopping, ensure thread is interrupted;
                 // if not, ensure thread is not interrupted.  This
