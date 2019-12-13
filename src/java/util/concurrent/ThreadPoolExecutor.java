@@ -1709,10 +1709,13 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
      * @since 1.6
      */
     public void allowCoreThreadTimeOut(boolean value) {
+        // 核心线程 空闲时间必须非负数  否则抛出异常
         if (value && keepAliveTime <= 0)
             throw new IllegalArgumentException("Core threads must have nonzero keep alive times");
+        // 设置 allowCoreThreadTimeOut 与 value 一致
         if (value != allowCoreThreadTimeOut) {
             allowCoreThreadTimeOut = value;
+            // 如果允许 allowCoreThreadTimeOut 执行柔和中断未执行任务的 workers
             if (value)
                 interruptIdleWorkers();
         }
