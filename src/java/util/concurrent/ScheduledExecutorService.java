@@ -97,6 +97,8 @@ public interface ScheduledExecutorService extends ExecutorService {
      * Creates and executes a one-shot action that becomes enabled
      * after the given delay.
      *
+     * 创建 并 执行一个 一次性无返回值的任务 在指定延迟时间之后开始执行
+     *
      * @param command the task to execute
      * @param delay the time from now to delay execution
      * @param unit the time unit of the delay parameter
@@ -113,6 +115,8 @@ public interface ScheduledExecutorService extends ExecutorService {
     /**
      * Creates and executes a ScheduledFuture that becomes enabled after the
      * given delay.
+     *
+     * 创建 并 执行一个 有返回值的任务 在指定延迟时间之后开始执行
      *
      * @param callable the function to execute
      * @param delay the time from now to delay execution
@@ -139,6 +143,13 @@ public interface ScheduledExecutorService extends ExecutorService {
      * takes longer than its period, then subsequent executions
      * may start late, but will not concurrently execute.
      *
+     * 创建 并执行 一个 周期性任务，第一次执行在指定延迟初始化时间后
+     * 并且 按周期有序执行（下一个任务设置的开始执行时间是固定的 依赖于initialDelay，period。但执行必须前一个任务执行完毕后）
+     * 如果任何任务执行 遇到异常 ，后面的执行将被禁止（任务不会再被提交）
+     * 除此之外，任务将终止 通过 取消或终止线程池
+     * 如果任何任务的执行 花费比周期更长的时间，后续的执行将会执行延迟，并且不会并发执行
+     * （前一个任务执行完毕 才提交后面的一个任务）
+     *
      * @param command the task to execute
      * @param initialDelay the time to delay first execution
      * @param period the period between successive executions
@@ -164,6 +175,10 @@ public interface ScheduledExecutorService extends ExecutorService {
      * encounters an exception, subsequent executions are suppressed.
      * Otherwise, the task will only terminate via cancellation or
      * termination of the executor.
+     *
+     * 创建 并执行 一个周期的 任务，这个任务 在指定的延迟时间之后开始执行
+     * 后续的任务 在之前任务结束后提交  并且 后续任务的执行 时间 到 前一个任务结束时间 固定一个指定的周期
+     * 下一个任务设置的开始执行时间 在上一个任务执行完毕后延迟delay的时间
      *
      * @param command the task to execute
      * @param initialDelay the time to delay first execution
