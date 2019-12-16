@@ -289,15 +289,24 @@ public class ScheduledThreadPoolExecutor
 
         /**
          * Overrides FutureTask version so as to reset/requeue if periodic.
+         * 定时任务 线程分到时间片后 将会调用任务重写的 run方法
          */
         public void run() {
+            // 获取当前任务是否是周期执行的
             boolean periodic = isPeriodic();
+            // 校验线程池状态
             if (!canRunInCurrentRunState(periodic))
+                // 当前线程池状态不应执行当前任务  执行取消
                 cancel(false);
+            // 如果当前任务不是周期任务 仅仅执行一次
             else if (!periodic)
+                // 调用父类的run方法执行
                 ScheduledFutureTask.super.run();
+            // 当前任务是周期任务 并且调用runAndReset 方法执行成功 则将下次任务加入到队列中
             else if (ScheduledFutureTask.super.runAndReset()) {
+                // 计算下次开始执行时间
                 setNextRunTime();
+                // 将下次任务加入到队列中
                 reExecutePeriodic(outerTask);
             }
         }
@@ -327,15 +336,20 @@ public class ScheduledThreadPoolExecutor
      * @param task the task
      */
     private void delayedExecute(RunnableScheduledFuture<?> task) {
+        // 如果线程池已经 不是running状态 执行拒绝策略
         if (isShutdown())
             reject(task);
         else {
+            // 将当前任务放入到 队列中
             super.getQueue().add(task);
+            // 线程池已经shutdown  将任务移除
             if (isShutdown() &&
                 !canRunInCurrentRunState(task.isPeriodic()) &&
                 remove(task))
                 task.cancel(false);
             else
+                // 如线程池中线程数 少于 核心线程数 增加线程 并将线程start
+                // 之后线程轮到时间片将会到 队列中拿任务 进行处理
                 ensurePrestart();
         }
     }
@@ -588,18 +602,24 @@ public class ScheduledThreadPoolExecutor
                                                      long initialDelay,
                                                      long delay,
                                                      TimeUnit unit) {
+        // 参数校验
         if (command == null || unit == null)
             throw new NullPointerException();
         if (delay <= 0)
             throw new IllegalArgumentException();
+        // 将 Runnable 任务 包装成 ScheduledFutureTask 任务  不支持有返回值的任务
         ScheduledFutureTask<Void> sft =
             new ScheduledFutureTask<Void>(command,
                                           null,
                                           triggerTime(initialDelay, unit),
                                           unit.toNanos(-delay));
+        // 用于给子类重新 进行以下自己实现包装
         RunnableScheduledFuture<Void> t = decorateTask(command, sft);
+        // 存储用于周期执行的任务 用于在上次任务执行成功后 将下次任务
         sft.outerTask = t;
+        // 延迟执行任务
         delayedExecute(t);
+        // 返回包装后的任务
         return t;
     }
 
