@@ -238,19 +238,25 @@ public class ScheduledThreadPoolExecutor
         }
 
         public long getDelay(TimeUnit unit) {
+            // 返回 剩余的延迟时间
             return unit.convert(time - now(), NANOSECONDS);
         }
 
         public int compareTo(Delayed other) {
+            // 同一个任务 返回0 相等
             if (other == this) // compare zero if same object
                 return 0;
+            // 任务都是 ScheduledFutureTask 实例
             if (other instanceof ScheduledFutureTask) {
                 ScheduledFutureTask<?> x = (ScheduledFutureTask<?>)other;
+                // 直接比较 time
                 long diff = time - x.time;
+                // 本对象任务 等待时间少 返回-1
                 if (diff < 0)
                     return -1;
                 else if (diff > 0)
                     return 1;
+                // 如果等待时间相等 比较 sequenceNumber 小的优先执行
                 else if (sequenceNumber < x.sequenceNumber)
                     return -1;
                 else
@@ -275,8 +281,10 @@ public class ScheduledThreadPoolExecutor
         private void setNextRunTime() {
             long p = period;
             if (p > 0)
+                // 固定周期的  在之前time基础上计算 上一任务延迟长 任务执行间隔 小于周期时间
                 time += p;
             else
+                // 固定每个任务之间的时间间隔 上一任务执行完的时间加上 周期时间  两任务之间间隔固定一个周期时间
                 time = triggerTime(-p);
         }
 
@@ -830,6 +838,8 @@ public class ScheduledThreadPoolExecutor
      * Specialized delay queue. To mesh with TPE declarations, this
      * class must be declared as a BlockingQueue<Runnable> even though
      * it can only hold RunnableScheduledFutures.
+     *
+     * 延迟队列
      */
     static class DelayedWorkQueue extends AbstractQueue<Runnable>
         implements BlockingQueue<Runnable> {
@@ -898,17 +908,26 @@ public class ScheduledThreadPoolExecutor
         /**
          * Sifts element added at bottom up to its heap-ordered spot.
          * Call only when holding lock.
+         *
+         * 新加入节点 上浮
          */
         private void siftUp(int k, RunnableScheduledFuture<?> key) {
             while (k > 0) {
+                // 树的父节点下标
                 int parent = (k - 1) >>> 1;
+                // 父节点任务
                 RunnableScheduledFuture<?> e = queue[parent];
+                // 调用任务实现的 compareTo 方法
+                // 如当前key 大于父节点 则退出循环
                 if (key.compareTo(e) >= 0)
                     break;
+                // 当前位置把父节点塞进去
                 queue[k] = e;
                 setIndex(e, k);
+                // 父节点位置 暂定为指定任务待上浮位置  继续上浮
                 k = parent;
             }
+            // 找到当前 任务的位置 更新队列该位置
             queue[k] = key;
             setIndex(key, k);
         }
@@ -940,9 +959,12 @@ public class ScheduledThreadPoolExecutor
          */
         private void grow() {
             int oldCapacity = queue.length;
+            // 扩容未原容量的1.5倍
             int newCapacity = oldCapacity + (oldCapacity >> 1); // grow 50%
+            // 如出现溢出 设置为最大容量
             if (newCapacity < 0) // overflow
                 newCapacity = Integer.MAX_VALUE;
+            // 队列迁移
             queue = Arrays.copyOf(queue, newCapacity);
         }
 
@@ -1030,25 +1052,35 @@ public class ScheduledThreadPoolExecutor
         public boolean offer(Runnable x) {
             if (x == null)
                 throw new NullPointerException();
+            // 任务实际类型
             RunnableScheduledFuture<?> e = (RunnableScheduledFuture<?>)x;
             final ReentrantLock lock = this.lock;
+            // 加锁 线程安全
             lock.lock();
             try {
                 int i = size;
+                // 队列满 扩容
                 if (i >= queue.length)
+                    // 扩容
                     grow();
+                // 新的元素个数
                 size = i + 1;
+                // 新加入的是队头
                 if (i == 0) {
                     queue[0] = e;
                     setIndex(e, 0);
+                // 非队头节点加入 需要 上浮 使用的是堆
                 } else {
+                    // 上浮
                     siftUp(i, e);
                 }
+                // 如果为队头节点 唤醒阻塞消费线程
                 if (queue[0] == e) {
                     leader = null;
                     available.signal();
                 }
             } finally {
+                // 释放锁
                 lock.unlock();
             }
             return true;
@@ -1058,6 +1090,7 @@ public class ScheduledThreadPoolExecutor
             offer(e);
         }
 
+        // 增加一个任务
         public boolean add(Runnable e) {
             return offer(e);
         }
@@ -1071,6 +1104,10 @@ public class ScheduledThreadPoolExecutor
          * first element with last and sifts it down.  Call only when
          * holding lock.
          * @param f the task to remove and return
+         *
+         * 将头结点从队列中移除
+         * 用队列尾巴元素取代头结点位置  并将该节点下沉
+         * 返回取出的头结点
          */
         private RunnableScheduledFuture<?> finishPoll(RunnableScheduledFuture<?> f) {
             int s = --size;
@@ -1098,25 +1135,39 @@ public class ScheduledThreadPoolExecutor
 
         public RunnableScheduledFuture<?> take() throws InterruptedException {
             final ReentrantLock lock = this.lock;
+            // 加锁
             lock.lockInterruptibly();
             try {
+                // 自旋
                 for (;;) {
+                    // 获得头结点
                     RunnableScheduledFuture<?> first = queue[0];
                     if (first == null)
+                        // 头结点为null 阻塞等待
                         available.await();
                     else {
+                        // 头结点不为null 获取头结点任务 的剩余延迟时间
                         long delay = first.getDelay(NANOSECONDS);
+                        // 如头结点任务 剩余延迟时间 已经为0 则获取任务成功 返回头结点任务
                         if (delay <= 0)
+                            // 返回头结点 并调整 队列
                             return finishPoll(first);
+                        // 之后需要阻塞  取消对头结点的引用 help gc
                         first = null; // don't retain ref while waiting
+                        // 如果别的线程是 leader 线程 那么本线程阻塞 直到被唤醒
+                        // 因为头结点任务 仅需一个线程处理即可  无所所有线程都等待 优化
                         if (leader != null)
+                            // 非leader线程 直接阻塞
                             available.await();
                         else {
+                            // 本线程设置为leader线程
                             Thread thisThread = Thread.currentThread();
                             leader = thisThread;
                             try {
+                                // leader线程 阻塞 剩余延迟时间
                                 available.awaitNanos(delay);
                             } finally {
+                                // 更新leader
                                 if (leader == thisThread)
                                     leader = null;
                             }
@@ -1124,8 +1175,10 @@ public class ScheduledThreadPoolExecutor
                     }
                 }
             } finally {
+                // 如leader为null 且 队头不为空 唤醒阻塞的节点
                 if (leader == null && queue[0] != null)
                     available.signal();
+                // 释放锁
                 lock.unlock();
             }
         }
