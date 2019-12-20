@@ -144,14 +144,20 @@ import sun.security.action.GetPropertyAction;
  *
  * @author  unascribed
  * @since   JDK1.0
+ *
+ * 绝对路径： 带有盘符的路径，windows下→C：//file
+ * 相对路径： 不带盘符的路径， .表示当前路径 …表示父目录
+ *
+ * 实现了序列化接口和比较器接口
  */
-
 public class File
     implements Serializable, Comparable<File>
 {
 
     /**
      * The FileSystem object representing the platform's local file system.
+     *
+     * 本地 本件系统
      */
     private static final FileSystem fs = DefaultFileSystem.getFileSystem();
 
@@ -160,6 +166,7 @@ public class File
      * pathname string uses the default name-separator character and does not
      * contain any duplicate or redundant separators.
      *
+     * 标准化的文件路径字符串 使用默认名称分割字符 并且 不包含重复或多余的分割符
      * @serial
      */
     private final String path;
@@ -271,6 +278,10 @@ public class File
      * @param   pathname  A pathname string
      * @throws  NullPointerException
      *          If the <code>pathname</code> argument is <code>null</code>
+     *
+     * 将入参路径做了标准化操作
+     *
+     * 将给定路径名字符串转换为抽象路径名来创建一个新 File 实例。
      */
     public File(String pathname) {
         if (pathname == null) {
@@ -311,6 +322,8 @@ public class File
      * @param   child   The child pathname string
      * @throws  NullPointerException
      *          If <code>child</code> is <code>null</code>
+     *
+     * 根据 parent 路径名字符串和 child 路径名字符串创建一个新 File 实例。
      */
     public File(String parent, String child) {
         if (child == null) {
@@ -354,6 +367,8 @@ public class File
      * @param   child   The child pathname string
      * @throws  NullPointerException
      *          If <code>child</code> is <code>null</code>
+     *
+     * 根据 parent 抽象路径名和 child 路径名字符串创建一个新 File 实例。
      */
     public File(File parent, String child) {
         if (child == null) {
@@ -408,6 +423,9 @@ public class File
      * @see #toURI()
      * @see java.net.URI
      * @since 1.4
+     *
+     * URI 转换为一个抽象路径名来创建一个新的 File 实例
+     *
      */
     public File(URI uri) {
 
@@ -431,8 +449,10 @@ public class File
 
         // Okay, now initialize
         p = fs.fromURIPath(p);
+        // 使用'/' 作为默认分隔符
         if (File.separatorChar != '/')
             p = p.replace('/', File.separatorChar);
+        // 标准化
         this.path = fs.normalize(p);
         this.prefixLength = fs.prefixLength(this.path);
     }
@@ -449,6 +469,7 @@ public class File
      * @return  The name of the file or directory denoted by this abstract
      *          pathname, or the empty string if this pathname's name sequence
      *          is empty
+     * 返回文件路径
      */
     public String getName() {
         int index = path.lastIndexOf(separatorChar);
@@ -468,6 +489,8 @@ public class File
      * @return  The pathname string of the parent directory named by this
      *          abstract pathname, or <code>null</code> if this pathname
      *          does not name a parent
+     *
+     * 返回路径parent名字
      */
     public String getParent() {
         int index = path.lastIndexOf(separatorChar);
@@ -494,6 +517,8 @@ public class File
      *          does not name a parent
      *
      * @since 1.2
+     *
+     * 返回parent文件
      */
     public File getParentFile() {
         String p = this.getParent();
@@ -507,6 +532,8 @@ public class File
      * separate the names in the name sequence.
      *
      * @return  The string form of this abstract pathname
+     *
+     * 将当前路径名转换为路径名字符串
      */
     public String getPath() {
         return path;
@@ -524,6 +551,8 @@ public class File
      *
      * @return  <code>true</code> if this abstract pathname is absolute,
      *          <code>false</code> otherwise
+     *
+     * 判断路径是否是 绝对路径
      */
     public boolean isAbsolute() {
         return fs.isAbsolute(this);
@@ -551,6 +580,8 @@ public class File
      *          If a required system property value cannot be accessed.
      *
      * @see     java.io.File#isAbsolute()
+     *
+     * 获取文件的绝对路径名字符串
      */
     public String getAbsolutePath() {
         return fs.resolve(this);
@@ -567,6 +598,8 @@ public class File
      *          If a required system property value cannot be accessed.
      *
      * @since 1.2
+     *
+     * 获取包装 绝对路径名  的新File文件对象
      */
     public File getAbsoluteFile() {
         String absPath = getAbsolutePath();
@@ -725,6 +758,8 @@ public class File
      * @see java.net.URI
      * @see java.net.URI#toURL()
      * @since 1.4
+     *
+     * 路径转化为 URI
      */
     public URI toURI() {
         try {
@@ -756,6 +791,8 @@ public class File
      *          If a security manager exists and its <code>{@link
      *          java.lang.SecurityManager#checkRead(java.lang.String)}</code>
      *          method denies read access to the file
+     *
+     * 如pathname 对应的文件存在 且 可读 返回true
      */
     public boolean canRead() {
         SecurityManager security = System.getSecurityManager();
@@ -837,6 +874,8 @@ public class File
      *          If a security manager exists and its <code>{@link
      *          java.lang.SecurityManager#checkRead(java.lang.String)}</code>
      *          method denies read access to the file
+     *
+     * 判断实例是否是一个目录
      */
     public boolean isDirectory() {
         SecurityManager security = System.getSecurityManager();
