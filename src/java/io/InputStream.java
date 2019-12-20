@@ -41,11 +41,14 @@ package java.io;
  * @see     java.io.OutputStream
  * @see     java.io.PushbackInputStream
  * @since   JDK1.0
+ *
+ * 该抽象类是所有字节输入流的超类  实现Closeable接口 （实际交给子类实现）
  */
 public abstract class InputStream implements Closeable {
 
     // MAX_SKIP_BUFFER_SIZE is used to determine the maximum buffer size to
     // use when skipping.
+    // 用于确定在skip方法中使用的最大缓存数组大小。
     private static final int MAX_SKIP_BUFFER_SIZE = 2048;
 
     /**
@@ -58,8 +61,15 @@ public abstract class InputStream implements Closeable {
      *
      * <p> A subclass must provide an implementation of this method.
      *
+     * 从输入流中读取下一字节数据。返回的字节值为一个范围在0-255之间的int数。若由于到达流的尾部而没有字节可获取，则返回-1.
+     *
+     * 直到数据可达，检测到流的末尾或者抛出一个异常，该方法才停止。
+     *
      * @return     the next byte of data, or <code>-1</code> if the end of the
      *             stream is reached.
+     *
+     *             下一个字节，若到达输入流结尾，则返回-1
+     *
      * @exception  IOException  if an I/O error occurs.
      */
     public abstract int read() throws IOException;
@@ -87,10 +97,13 @@ public abstract class InputStream implements Closeable {
      * <p> The <code>read(b)</code> method for class <code>InputStream</code>
      * has the same effect as: <pre><code> read(b, 0, b.length) </code></pre>
      *
-     * @param      b   the buffer into which the data is read.
-     * @return     the total number of bytes read into the buffer, or
-     *             <code>-1</code> if there is no more data because the end of
-     *             the stream has been reached.
+     * 从输入流中读取一些字节并将它们存储到缓存数组b中
+     * 若b的长度为0，则没有字节被读取，返回0；若由于流在文件的尾部，没有字节可读，则返回-1。
+     * 读取的第一个字节保存到b[0]，下一个保存到b[1]，以此类推。读取字节的数组小于等于数组b的长度。
+     *
+     * @param      b   缓存所读取的数据
+     * @return     读取字节数到缓存的数目。由于到达流的结尾而不可读取数据时，返回-1.
+     *
      * @exception  IOException  If the first byte cannot be read for any reason
      * other than the end of the file, if the input stream has been closed, or
      * if some other I/O error occurs.
@@ -142,13 +155,15 @@ public abstract class InputStream implements Closeable {
      * end of file is detected, or an exception is thrown. Subclasses are encouraged
      * to provide a more efficient implementation of this method.
      *
-     * @param      b     the buffer into which the data is read.
-     * @param      off   the start offset in array <code>b</code>
-     *                   at which the data is written.
-     * @param      len   the maximum number of bytes to read.
-     * @return     the total number of bytes read into the buffer, or
-     *             <code>-1</code> if there is no more data because the end of
-     *             the stream has been reached.
+     * 从输入流读取len个字节数据，并保存到数组中。读取的数组最多为len。真正读取的字节数目将作为返回值返回。
+     * 若len=0，则没有字节需要读取，返回为0；若字节不可达，则返回-1。
+     * 读取到的第一个字节保存到b[off]中，下一个保存在b[off+1]，以此类推。
+     *
+     * @param      b     缓存所读取的数据
+     * @param      off   将读取的数据写入数组b的起始偏移地址
+     * @param      len   读取的最大字节数组
+     * @return     保存到buffer中真正的字节数，若由于到达流的结尾而无法读取数据，返回-1.
+     *
      * @exception  IOException If the first byte cannot be read for any reason
      * other than end of file, or if the input stream has been closed, or if
      * some other I/O error occurs.
@@ -204,8 +219,10 @@ public abstract class InputStream implements Closeable {
      * encouraged to provide a more efficient implementation of this method.
      * For instance, the implementation may depend on the ability to seek.
      *
+     * 跳过输入流的n个字节的数据，并返回真正跳过的字节数目。若n为负，则没有字节被跳过。
+     *
      * @param      n   the number of bytes to be skipped.
-     * @return     the actual number of bytes skipped.
+     * @return     返回真正跳过的字节数目
      * @exception  IOException  if the stream does not support seek,
      *                          or if some other I/O error occurs.
      */
@@ -252,6 +269,10 @@ public abstract class InputStream implements Closeable {
      *
      * <p> This method should be overridden by subclasses.
      *
+     * 返回一个可以在该输入流中读取（或跳过）的字节数的估计，而不阻塞此输入流的下一次调用。
+     *
+     * 此方法需要被子类重写
+     *
      * @return     an estimate of the number of bytes that can be read (or skipped
      *             over) from this input stream without blocking or {@code 0} when
      *             it reaches the end of the input stream.
@@ -267,6 +288,9 @@ public abstract class InputStream implements Closeable {
      *
      * <p> The <code>close</code> method of <code>InputStream</code> does
      * nothing.
+     *
+     * 关闭输入流并释放与其相关的系统资源。
+     * 需要被子类重写
      *
      * @exception  IOException  if an I/O error occurs.
      */
@@ -294,8 +318,11 @@ public abstract class InputStream implements Closeable {
      * <p> The <code>mark</code> method of <code>InputStream</code> does
      * nothing.
      *
-     * @param   readlimit   the maximum limit of bytes that can be read before
-     *                      the mark position becomes invalid.
+     * 标记输入流中当前的位置。当调用reset方法可以回到上次标记的位置，使得后面可以重新读取相同的字节。
+     * 参数 readlimit 告诉输入流允许被读取的字节数目。超过该数目，则标记位失效（invalid）
+     *
+     * @param   readlimit   在标志位变为invalid之前，可被读取的最大字节数目.
+     *
      * @see     java.io.InputStream#reset()
      */
     public synchronized void mark(int readlimit) {}
@@ -339,6 +366,17 @@ public abstract class InputStream implements Closeable {
      * <p>The method <code>reset</code> for class <code>InputStream</code>
      * does nothing except throw an <code>IOException</code>.
      *
+     * 将流重定位到最后一次对此输入流调用mark方法时的位置。
+     * 当markSupported方法返回true，则
+     * 1、若mark方法自创建流以来从未被调用或者从流中读取的字节数目超过上次调用mark方法所定义的readlimit，则抛出IOException异常。
+     * 2、若未抛出IOException，则将该流重新设置为状态：最近一次调用mark后（若未调用过mark，则从文件开头开始）读取的所有字节重新提供
+     *
+     * 给read方法的后续调用者，如何从调用reset时起将作为下一输入数据的字节。
+     *
+     * 当markSupported方法返回false，则
+     * 1、调用reset方法会抛出IOException
+     * 2、若IOException未被抛出，则流将被重置到一个固定状态，该状态依赖于输入流的类型和被创建的方式
+     *
      * @exception  IOException  if this stream has not been marked or if the
      *               mark has been invalidated.
      * @see     java.io.InputStream#mark(int)
@@ -354,6 +392,11 @@ public abstract class InputStream implements Closeable {
      * <code>reset</code> are supported is an invariant property of a
      * particular input stream instance. The <code>markSupported</code> method
      * of <code>InputStream</code> returns <code>false</code>.
+     *
+     * 测试输入流是否支持test和reset方法。所支持的mark和reset是否是输入流实例的不变属性
+     * InputStream的markSupported方法返回false。
+     * 若流实例支持mark和reset方法，返回true；否则返回false。
+     *
      *
      * @return  <code>true</code> if this stream instance supports the mark
      *          and reset methods; <code>false</code> otherwise.
